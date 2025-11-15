@@ -46,8 +46,8 @@ export function TaskCard({
     const sectors = Array.isArray(task.sectors)
       ? task.sectors.map((s: any) =>
           typeof s === "object" && s !== null
-            ? { sector: Number(s.sector), status: (s.status || "PENDING") as TaskStatus }
-            : { sector: Number(s), status: "PENDING" as TaskStatus }
+            ? { sector: (s.sector), status: (s.status || "PENDING") as TaskStatus }
+            : { sector: (s), status: "PENDING" as TaskStatus }
         )
       : [];
     return sectors.sort((a, b) => a.sector - b.sector);
