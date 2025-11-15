@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Download, Edit3, Image as ImageIcon, ImageOff, Archive } from "lucide-react";
+import { Download, Edit3, Image as ImageIcon, ImageOff } from "lucide-react";
 
 import {
   fetchJobDetail,
@@ -26,7 +26,7 @@ type Props = {
 };
 
 type SectorBlock = {
-  sector: number;
+  sector: string;
   requiredTypes?: string[];
   currentIndex?: number;
   status?: string;
@@ -46,15 +46,20 @@ function resolvePhotoUrl(p: PhotoItem | undefined | null): string | undefined {
   return `${base}/api/photos/${encodeURIComponent((p as any).id)}/raw`;
 }
 
-/** Prefer explicit photo.sector; else parse from key/url using `sec{n}_`. */
-function getPhotoSector(p: any): number | null {
-  if (typeof p?.sector === "number" && Number.isFinite(p.sector)) return p.sector;
+/**
+ * Prefer explicit photo.sector; else parse from key/url using `sec{n}_`.
+ * Now returns a string or null (sectors are strings).
+ */
+function getPhotoSector(p: any): string | null {
+  if (p == null) return null;
+  // if explicit sector exists, return it as string
+  if (p?.sector != null) return String(p.sector);
   const src: string = String(p?.s3Key || p?.s3Url || "");
   if (!src) return null;
+  // try to find sec123 pattern and return number as string
   const m = src.toLowerCase().match(/(?:^|[\/_.-])sec(\d+)(?:[_\/.-]|$)/i);
   if (m && m[1]) {
-    const n = Number(m[1]);
-    return Number.isFinite(n) ? n : null;
+    return String(Number(m[1])); // return numeric part as string "12"
   }
   return null;
 }
@@ -81,27 +86,49 @@ export default function FilePreviewModal({ isOpen, taskId, onClose }: Props) {
       .finally(() => setLoading(false));
   }, [isOpen, taskId]);
 
-  /** Sectors on job */
-  const sectorsFromJob = useMemo<number[]>(() => {
+  /** Sectors on job — now strings */
+  const sectorsFromJob = useMemo<string[]>(() => {
     const j: any = data?.job;
     if (!j) return [];
+
+    // j.sectors could be an array of sector blocks or simple values
     if (Array.isArray(j.sectors) && j.sectors.length) {
       return j.sectors
-        .map((b: any) => Number((b && (b.sector ?? b)) ?? NaN))
-        .filter((n) => Number.isFinite(n))
-        .sort((a, b) => a - b);
+        .map((b: any) => {
+          const s = (b && (b.sector ?? b)) ?? "";
+          return s != null ? String(s) : "";
+        })
+        .map((s: string) => s.trim())
+        .filter((s: string) => s !== "")
+        .sort((a, b) => {
+          // numeric-like strings sort numerically, else lexicographically
+          const an = Number(a);
+          const bn = Number(b);
+          if (!Number.isNaN(an) && !Number.isNaN(bn)) return an - bn;
+          return a.localeCompare(b);
+        });
     }
+
+    // j.sectorJobs might be an object keyed by sector (string keys)
     if (isRecord(j.sectorJobs)) {
       return Object.keys(j.sectorJobs)
-        .map((k) => Number(k))
-        .filter((n) => Number.isFinite(n))
-        .sort((a, b) => a - b);
+        .map((k) => String(k).trim())
+        .filter((k) => k !== "")
+        .sort((a, b) => {
+          const an = Number(a);
+          const bn = Number(b);
+          if (!Number.isNaN(an) && !Number.isNaN(bn)) return an - bn;
+          return a.localeCompare(b);
+        });
     }
-    if (typeof j.sector === "number") return [j.sector];
+
+    // single sector
+    if (j.sector != null) return [String(j.sector)];
+
     return [];
   }, [data?.job]);
 
-  const [selectedSector, setSelectedSector] = useState<number | null>(null);
+  const [selectedSector, setSelectedSector] = useState<string | null>(null);
   useEffect(() => {
     if (!isOpen) return;
     if (sectorsFromJob.length === 0) setSelectedSector(null);
@@ -114,10 +141,10 @@ export default function FilePreviewModal({ isOpen, taskId, onClose }: Props) {
     if (!j) return null;
 
     if (selectedSector != null && Array.isArray(j.sectors)) {
-      const found = j.sectors.find((b: any) => Number(b?.sector) === Number(selectedSector));
+      const found = j.sectors.find((b: any) => String(b?.sector ?? b) === String(selectedSector));
       if (found && isRecord(found)) {
         return {
-          sector: Number(found.sector),
+          sector: String(found.sector ?? selectedSector),
           requiredTypes: Array.isArray(found.requiredTypes) ? found.requiredTypes : undefined,
           currentIndex: typeof found.currentIndex === "number" ? found.currentIndex : undefined,
           status: typeof found.status === "string" ? found.status : undefined,
@@ -127,7 +154,7 @@ export default function FilePreviewModal({ isOpen, taskId, onClose }: Props) {
 
     if (selectedSector == null && (j.requiredTypes || j.currentIndex != null)) {
       return {
-        sector: typeof j.sector === "number" ? j.sector : 0,
+        sector: j.sector != null ? String(j.sector) : "",
         requiredTypes: Array.isArray(j.requiredTypes) ? j.requiredTypes : undefined,
         currentIndex: typeof j.currentIndex === "number" ? j.currentIndex : undefined,
         status: typeof j.status === "string" ? j.status : undefined,
@@ -139,16 +166,16 @@ export default function FilePreviewModal({ isOpen, taskId, onClose }: Props) {
       : null;
   }, [data?.job, selectedSector]);
 
-  /** Map: sector -> (type -> latest PhotoItem) */
+  /** Map: sector (string) -> (type -> latest PhotoItem) */
   const latestByTypeForSector = useMemo(() => {
-    const out = new Map<number, Map<string, PhotoItem>>();
+    const out = new Map<string, Map<string, PhotoItem>>();
     const photos = Array.isArray(data?.photos) ? (data!.photos as PhotoItem[]) : [];
     for (const p of photos) {
       const t = (p.type || "").toUpperCase();
       const sec = getPhotoSector(p);
-      if (!Number.isFinite(sec)) continue;
-      if (!out.has(sec!)) out.set(sec!, new Map());
-      out.get(sec!)!.set(t, p);
+      if (!sec) continue;
+      if (!out.has(sec)) out.set(sec, new Map());
+      out.get(sec)!.set(t, p);
     }
     return out;
   }, [data?.photos]);
@@ -183,9 +210,9 @@ export default function FilePreviewModal({ isOpen, taskId, onClose }: Props) {
         : "—";
 
     const sectorDisplay =
-      sectorBlock?.sector != null
+      sectorBlock?.sector != null && sectorBlock?.sector !== ""
         ? String(sectorBlock.sector)
-        : typeof j.sector === "number"
+        : j.sector != null
         ? String(j.sector)
         : "—";
 
@@ -226,7 +253,7 @@ export default function FilePreviewModal({ isOpen, taskId, onClose }: Props) {
     return [];
   }, [sectorBlock?.requiredTypes, data?.job]);
 
-  const canSectorDownload = selectedSector != null && Number.isFinite(selectedSector);
+  const canSectorDownload = selectedSector != null && selectedSector !== "";
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -248,7 +275,7 @@ export default function FilePreviewModal({ isOpen, taskId, onClose }: Props) {
             {sectorsFromJob.length > 1 && (
               <Select
                 value={selectedSector != null ? String(selectedSector) : undefined}
-                onValueChange={(v) => setSelectedSector(Number(v))}
+                onValueChange={(v) => setSelectedSector(String(v))}
               >
                 <SelectTrigger className="w-44">
                   <SelectValue placeholder="Select sector" />
@@ -409,7 +436,11 @@ export default function FilePreviewModal({ isOpen, taskId, onClose }: Props) {
                   {/* Sector-wise — enabled only when a sector is selected */}
                   <Button
                     size="sm"
-                    onClick={() => selectedSector != null && downloadSectorWorkbook()}
+                    onClick={() => {
+                      if (!taskId || !selectedSector) return;
+                      // pass taskId and the selected sector string to the API helper
+                      downloadSectorWorkbook();
+                    }}
                     disabled={!data || loading || !canSectorDownload}
                   >
                     <Download className="w-4 h-4 mr-2" />

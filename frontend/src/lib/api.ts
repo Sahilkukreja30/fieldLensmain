@@ -1,6 +1,7 @@
 // src/lib/api.ts
 import axios from "axios";
 
+
 /** ---------- AXIOS CLIENT ---------- */
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api",
@@ -9,7 +10,7 @@ export const api = axios.create({
 
 /** ---------- TYPES (keep in sync with backend) ---------- */
 export type SectorBlock = {
-  sector: number;
+  sector: string;
   requiredTypes: string[];
   currentIndex: number;
   status: "PENDING" | "IN_PROGRESS" | "DONE" | "FAILED";
@@ -76,7 +77,7 @@ export async function fetchJobDetail(jobId: string, opts?: { sector?: number }) 
 export async function createJob(input: {
   workerPhone: string;
   siteId: string;
-  sector: number;
+  sector: string;
 }): Promise<BackendJob> {
   const { data } = await api.post("/jobs", input);
   return data;

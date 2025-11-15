@@ -14,7 +14,7 @@ export type UITask = {
   status: TaskStatus;
   createdAt: string;
   siteId?: string;
-  sectors?: Array<{ sector: number; status?: TaskStatus } | number>;
+  sectors?: Array<{ sector: string; status?: TaskStatus } | number>;
 };
 
 export function TaskCard({

@@ -23,10 +23,7 @@ const phoneE164 = /^\+?[1-9]\d{6,14}$/;
 const FormSchema = z.object({
   whatsappNumber: z.string().regex(phoneE164, "Use E.164 format like +1234567890"),
   siteId: z.string().min(1, "Site ID is required"),
-  sectorNumber: z
-    .string()
-    .min(1, "Sector is required")
-    .refine((v) => Number.isInteger(Number(v)) && Number(v) >= 0, "Sector must be a non-negative integer"),
+  sectorNumber: z.string().min(1, "Sector is required"), // <-- NOW STRING
 });
 
 type FormValues = z.infer<typeof FormSchema>;
@@ -58,15 +55,15 @@ export default function CreateTaskDialog({
       const payload = {
         workerPhone: values.whatsappNumber,
         siteId: values.siteId.trim(),
-        sector: Number(values.sectorNumber),
+        sector: values.sectorNumber.trim(), // <-- STRING NOW
       };
-      // Backend will merge sector into existing job (same worker+siteId) or create new job
+
       const newJob = await createJob(payload);
 
       toast({
         title: "Job Saved",
         description:
-          `Assigned sector ${payload.sector} at site ${payload.siteId} to ${payload.workerPhone}.`,
+          `Assigned sector "${payload.sector}" at site ${payload.siteId} to ${payload.workerPhone}.`,
       });
 
       onCreated?.(newJob);
@@ -98,6 +95,7 @@ export default function CreateTaskDialog({
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  
                   <FormField
                     control={form.control}
                     name="whatsappNumber"
@@ -111,6 +109,7 @@ export default function CreateTaskDialog({
                       </FormItem>
                     )}
                   />
+
                   <FormField
                     control={form.control}
                     name="siteId"
@@ -124,6 +123,7 @@ export default function CreateTaskDialog({
                       </FormItem>
                     )}
                   />
+
                   <FormField
                     control={form.control}
                     name="sectorNumber"
@@ -131,12 +131,13 @@ export default function CreateTaskDialog({
                       <FormItem>
                         <FormLabel>Sector *</FormLabel>
                         <FormControl>
-                          <Input type="number" min={0} placeholder="e.g. 2" {...field} />
+                          <Input type="text" placeholder="e.g. A-12, North-2, etc." {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+
                 </div>
 
                 <DialogFooter className="gap-2 sm:gap-3">
