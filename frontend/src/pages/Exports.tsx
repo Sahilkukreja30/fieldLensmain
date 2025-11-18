@@ -132,6 +132,18 @@ export default function Exports() {
                       <div>
                         <span className="font-medium">JOB ID:</span> {exportItem.id}
                       </div>
+                      <div>
+                        <span className="font-medium">Circle:</span> {exportItem.circle}
+                      </div>
+                      <div>
+                        <span className="font-medium">Company:</span> {exportItem.company}
+                      </div>
+                      <div>
+                        <span className="font-medium">SiteId:</span> {exportItem.siteId}
+                      </div>
+                      <div>
+                        <span className="font-medium">Sector:</span> {exportItem.sector.map((e)=>e.sector)}
+                      </div>
                     </div>
 
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
