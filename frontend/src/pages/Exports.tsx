@@ -47,7 +47,10 @@ export default function Exports() {
     return jobs.map((j) => ({
       id: j.id,
       title: `Job • ${j.workerPhone}`,
-      phoneNumber: j.workerPhone,
+      circle:j.circle,
+      company:j.company,
+      siteId:j.siteId,
+      sector:j.sectors,
       status: toUpper(j.status) as TaskStatus,
       createdAt: toIsoCreated(j),
     }));

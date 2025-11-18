@@ -71,6 +71,8 @@ export default function TaskHistory() {
       id: j.id,
       title: `Job • ${j.workerPhone}`,
       phoneNumber: j.workerPhone,
+      circle:j.circle,
+      company:j.company,
       status: toUpper(j.status) as TaskStatus,
       createdAt: toIsoCreated(j),
       siteId: (j as any)?.siteId,
